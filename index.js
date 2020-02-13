@@ -1,13 +1,14 @@
-const MongoClient = require('mongodb').MongoClient;  //mongodb - node.js driver + imported MongoClient object from it
+const MongoClient = require('mongodb').MongoClient;  
 const assert = require('assert').strict;
+const dboper = require('./operations');
 
 const url = 'mongodb://localhost:27017/'; //port number for mongodb server
 const dbname = 'nucampsite';
 
 //use connect method to open connection to db server, connect method's callback provides client object we can use to access the db
 MongoClient.connect(url, { useUnifiedTopology: true }, (err, client) => {
-
-    assert.strictEqual(err, null); //checks to see if first argument strictly equals the expected second argument, if actual and expected values match we continue on, but if not then assert will fail, throw and error, terminate the entire app, and log error to console.
+    
+    assert.strictEqual(err, null);
 
     console.log('Connected correctly to server');
 
@@ -17,21 +18,33 @@ MongoClient.connect(url, { useUnifiedTopology: true }, (err, client) => {
         assert.strictEqual(err, null);
         console.log('Dropped Collection', result);
 
-        //recreate collection
-        const collection = db.collection('campsites');
+        //call insertDocument method from operations.js
+        dboper.insertDocument(db, {name: "Breadcrumb Trail Campground", description: "Test"}, 'campsites', result => {
+            console.log('Insert Document:', result.ops);
 
-        //insert new document
-        collection.insertOne({name: "Breadcrumb Trail Campground", description: "Test"}, (err, result) => {
-            assert.strictEqual(err, null);
-            console.log('Insert Document:', result.ops); //ops contains array that contains the inserted document
+            dboper.findDocuments(db, 'campsites', docs => {
+                console.log('Found Documents:' , docs);
 
-            collection.find().toArray((err, docs) => { //convert document objects to array to display in console
-                assert.strictEqual(err, null);
-                console.log('Found Documents:', docs);
+                dboper.updateDocument(db, { name: "Breadcrumb Trail Campground"}, 
+                    { description: "Updated Test Description"}, 'campsites', 
+                    result => {
+                        console.log('Updated Document Count:', result.result.nModified);
 
-                client.close(); //close connection to db server
+                        dboper.findDocuments(db, 'campsites', docs => {
+                            console.log('Found Documents:', docs);
+
+                            dboper.removeDocument(db, { name: "Breadcrumb Trail Campground"},
+                                'campsites', result => {
+                                    console.log('Deleted Document Count:', result.deletedCount);
+                                    client.close();
+                                }
+                            );
+                        });
+                    }
+                );
             });
-        });
+         });
     });
-}); 
-//Note the nested callback functions used for asynchronous operations - not something we would normally do
+});
+//Note call to insertDocument arguments contains a callback function that won't execute until the end of the insertDocument function when it is called
+//We call one function and define another in the parameter list
